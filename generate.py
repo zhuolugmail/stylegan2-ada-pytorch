@@ -79,11 +79,18 @@ def generate_images(
     """
 
     print('Loading networks from "%s"...' % network_pkl)
-    device = torch.device('cuda')
+
+    # Based on https://github.com/NVlabs/stylegan2-ada-pytorch/issues/54
+    device = torch.device('cpu')
     with dnnlib.util.open_url(network_pkl) as f:
         G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
 
     os.makedirs(outdir, exist_ok=True)
+
+    if network_pkl:
+        short_name = network_pkl.split('/')[-1].replace('.pkl', '')
+    else:
+        short_name = 'default'
 
     # Synthesize the result of a W projection.
     if projected_w is not None:
@@ -96,7 +103,7 @@ def generate_images(
         for idx, w in enumerate(ws):
             img = G.synthesis(w.unsqueeze(0), noise_mode=noise_mode)
             img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-            img = PIL.Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{outdir}/proj{idx:02d}.png')
+            img = PIL.Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{outdir}/proj-{short_name}-{idx:010d}.png')
         return
 
     if seeds is None:
@@ -116,9 +123,10 @@ def generate_images(
     for seed_idx, seed in enumerate(seeds):
         print('Generating image for seed %d (%d/%d) ...' % (seed, seed_idx, len(seeds)))
         z = torch.from_numpy(np.random.RandomState(seed).randn(1, G.z_dim)).to(device)
-        img = G(z, label, truncation_psi=truncation_psi, noise_mode=noise_mode)
+        img = G(z, label, truncation_psi=truncation_psi, noise_mode=noise_mode,
+                force_fp32 = True)
         img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-        PIL.Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{outdir}/seed{seed:04d}.png')
+        PIL.Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{outdir}/{short_name}-{seed:010d}.png')
 
 
 #----------------------------------------------------------------------------
