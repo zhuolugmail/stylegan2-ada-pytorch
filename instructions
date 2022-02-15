@@ -13,5 +13,5 @@ install-gpu.sh  or  install-cpu.sh
 
 # Command to train
 python train.py --data=../data/processed --outdir=../outdir \
-       --gpus=1 --kimg=100 --snap=4 --metrics=None \
+       --gpus=1 --kimg=100 --snap=8 --metrics=None \
        --cfg=<some cfg> --resume=<last_pkl or others>
