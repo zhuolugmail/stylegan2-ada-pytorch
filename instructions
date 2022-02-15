@@ -1,0 +1,17 @@
+
+# Check python version
+python --version
+
+# Check GPU support
+nvidia-smi
+
+# Set up environment
+python -m venv ../sg2
+
+# Based on if you have CPU, set up environment using one of
+install-gpu.sh  or  install-cpu.sh
+
+# Command to train
+python train.py --data=../data/processed --outdir=../outdir \
+       --gpus=1 --kimg=100 --snap=4 --metrics=None \
+       --cfg=<some cfg> --resume=<last_pkl or others>
