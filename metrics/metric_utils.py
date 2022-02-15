@@ -179,8 +179,15 @@ class ProgressMonitor:
 
 def compute_feature_stats_for_dataset(opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1, batch_size=64, data_loader_kwargs=None, max_items=None, **stats_kwargs):
     dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs)
+
+    cpuonly = not torch.cuda.is_available()
+
     if data_loader_kwargs is None:
-        data_loader_kwargs = dict(pin_memory=True, num_workers=3, prefetch_factor=2)
+        
+        if cpuonly:
+            data_loader_kwargs = dict(pin_memory=False, num_workers=3, prefetch_factor=2)
+        else:
+            data_loader_kwargs = dict(pin_memory=True, num_workers=3, prefetch_factor=2)
 
     # Try to lookup from cache.
     cache_file = None
@@ -230,6 +237,9 @@ def compute_feature_stats_for_dataset(opts, detector_url, detector_kwargs, rel_l
 #----------------------------------------------------------------------------
 
 def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1, batch_size=64, batch_gen=None, jit=False, **stats_kwargs):
+
+    cpuonly = not torch.cuda.is_available()
+
     if batch_gen is None:
         batch_gen = min(batch_size, 4)
     assert batch_size % batch_gen == 0
@@ -262,7 +272,12 @@ def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel
         for _i in range(batch_size // batch_gen):
             z = torch.randn([batch_gen, G.z_dim], device=opts.device)
             c = [dataset.get_label(np.random.randint(len(dataset))) for _i in range(batch_gen)]
-            c = torch.from_numpy(np.stack(c)).pin_memory().to(opts.device)
+
+            if cpuonly:
+                c = torch.from_numpy(np.stack(c)).to(opts.device)
+            else:
+                c = torch.from_numpy(np.stack(c)).pin_memory().to(opts.device)
+            
             images.append(run_generator(z, c))
         images = torch.cat(images)
         if images.shape[1] == 1:

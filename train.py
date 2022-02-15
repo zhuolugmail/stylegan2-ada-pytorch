@@ -65,6 +65,8 @@ def setup_training_loop_kwargs(
     nobench    = None, # Disable cuDNN benchmarking: <bool>, default = False
     workers    = None, # Override number of DataLoader workers: <int>, default = 3
 ):
+    cpuonly = not torch.cuda.is_available()
+
     args = dnnlib.EasyDict()
 
     # ------------------------------------------
@@ -73,6 +75,10 @@ def setup_training_loop_kwargs(
 
     if gpus is None:
         gpus = 1
+
+    if cpuonly:
+        gpus = 1
+
     assert isinstance(gpus, int)
     if not (gpus >= 1 and gpus & (gpus - 1) == 0):
         raise UserError('--gpus must be a power of two')
@@ -80,6 +86,10 @@ def setup_training_loop_kwargs(
 
     if snap is None:
         snap = 50
+
+        if cpuonly:
+            snap = 4
+
     assert isinstance(snap, int)
     if snap < 1:
         raise UserError('--snap must be at least 1')
@@ -92,6 +102,9 @@ def setup_training_loop_kwargs(
     if not all(metric_main.is_valid_metric(metric) for metric in metrics):
         raise UserError('\n'.join(['--metrics can only contain the following values:'] + metric_main.list_valid_metrics()))
     args.metrics = metrics
+
+    if cpuonly:
+        args.metrics = []
 
     if seed is None:
         seed = 0
@@ -106,6 +119,10 @@ def setup_training_loop_kwargs(
     assert isinstance(data, str)
     args.training_set_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False)
     args.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, num_workers=3, prefetch_factor=2)
+
+    if cpuonly:
+        args.data_loader_kwargs = dnnlib.EasyDict(pin_memory=False, num_workers=3, prefetch_factor=2)
+
     try:
         training_set = dnnlib.util.construct_class_by_name(**args.training_set_kwargs) # subclass of training.dataset.Dataset
         args.training_set_kwargs.resolution = training_set.resolution # be explicit about resolution
@@ -327,6 +344,10 @@ def setup_training_loop_kwargs(
 
     if fp32 is None:
         fp32 = False
+
+    if cpuonly:
+        fp32 = True
+
     assert isinstance(fp32, bool)
     if fp32:
         args.G_kwargs.synthesis_kwargs.num_fp16_res = args.D_kwargs.num_fp16_res = 0
@@ -375,6 +396,10 @@ def subprocess_fn(rank, args, temp_dir):
 
     # Init torch_utils.
     sync_device = torch.device('cuda', rank) if args.num_gpus > 1 else None
+
+    if not torch.cuda.is_available():
+        sync_device = None
+
     training_stats.init_multiprocessing(rank=rank, sync_device=sync_device)
     if rank != 0:
         custom_ops.verbosity = 'none'

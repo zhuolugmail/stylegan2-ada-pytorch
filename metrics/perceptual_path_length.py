@@ -93,6 +93,9 @@ class PPLSampler(torch.nn.Module):
 #----------------------------------------------------------------------------
 
 def compute_ppl(opts, num_samples, epsilon, space, sampling, crop, batch_size, jit=False):
+
+    cpuonly = not torch.cuda.is_available()
+
     dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs)
     vgg16_url = 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/metrics/vgg16.pt'
     vgg16 = metric_utils.get_feature_detector(vgg16_url, num_gpus=opts.num_gpus, rank=opts.rank, verbose=opts.progress.verbose)
@@ -110,7 +113,12 @@ def compute_ppl(opts, num_samples, epsilon, space, sampling, crop, batch_size, j
     for batch_start in range(0, num_samples, batch_size * opts.num_gpus):
         progress.update(batch_start)
         c = [dataset.get_label(np.random.randint(len(dataset))) for _i in range(batch_size)]
-        c = torch.from_numpy(np.stack(c)).pin_memory().to(opts.device)
+
+        if cpuonly:
+            c = torch.from_numpy(np.stack(c)).to(opts.device)
+        else:
+            c = torch.from_numpy(np.stack(c)).pin_memory().to(opts.device)
+        
         x = sampler(c)
         for src in range(opts.num_gpus):
             y = x.clone()

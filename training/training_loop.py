@@ -121,7 +121,14 @@ def training_loop(
 ):
     # Initialize.
     start_time = time.time()
-    device = torch.device('cuda', rank)
+
+    cpuonly = not torch.cuda.is_available()
+
+    if cpuonly:
+        device = torch.device('cpu', rank)
+    else:
+        device = torch.device('cuda', rank)
+    
     np.random.seed(random_seed * num_gpus + rank)
     torch.manual_seed(random_seed * num_gpus + rank)
     torch.backends.cudnn.benchmark = cudnn_benchmark    # Improves training speed.
@@ -210,8 +217,10 @@ def training_loop(
         phase.start_event = None
         phase.end_event = None
         if rank == 0:
-            phase.start_event = torch.cuda.Event(enable_timing=True)
-            phase.end_event = torch.cuda.Event(enable_timing=True)
+
+            if not cpuonly:
+                phase.start_event = torch.cuda.Event(enable_timing=True)
+                phase.end_event = torch.cuda.Event(enable_timing=True)
 
     # Export sample images.
     grid_size = None
@@ -263,7 +272,12 @@ def training_loop(
             all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
             all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
-            all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
+
+            if cpuonly:
+                all_gen_c = torch.from_numpy(np.stack(all_gen_c)).to(device)
+            else:
+                all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
+
             all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]
 
         # Execute training phases.
@@ -329,8 +343,11 @@ def training_loop(
         fields += [f"sec/kimg {training_stats.report0('Timing/sec_per_kimg', (tick_end_time - tick_start_time) / (cur_nimg - tick_start_nimg) * 1e3):<7.2f}"]
         fields += [f"maintenance {training_stats.report0('Timing/maintenance_sec', maintenance_time):<6.1f}"]
         fields += [f"cpumem {training_stats.report0('Resources/cpu_mem_gb', psutil.Process(os.getpid()).memory_info().rss / 2**30):<6.2f}"]
-        fields += [f"gpumem {training_stats.report0('Resources/peak_gpu_mem_gb', torch.cuda.max_memory_allocated(device) / 2**30):<6.2f}"]
-        torch.cuda.reset_peak_memory_stats()
+
+        if not cpuonly:
+            fields += [f"gpumem {training_stats.report0('Resources/peak_gpu_mem_gb', torch.cuda.max_memory_allocated(device) / 2**30):<6.2f}"]
+            torch.cuda.reset_peak_memory_stats()
+
         fields += [f"augment {training_stats.report0('Progress/augment', float(augment_pipe.p.cpu()) if augment_pipe is not None else 0):.3f}"]
         training_stats.report0('Timing/total_hours', (tick_end_time - start_time) / (60 * 60))
         training_stats.report0('Timing/total_days', (tick_end_time - start_time) / (24 * 60 * 60))

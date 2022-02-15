@@ -81,7 +81,12 @@ def generate_images(
     print('Loading networks from "%s"...' % network_pkl)
 
     # Based on https://github.com/NVlabs/stylegan2-ada-pytorch/issues/54
-    device = torch.device('cpu')
+
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
+
     with dnnlib.util.open_url(network_pkl) as f:
         G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
 
@@ -123,8 +128,13 @@ def generate_images(
     for seed_idx, seed in enumerate(seeds):
         print('Generating image for seed %d (%d/%d) ...' % (seed, seed_idx, len(seeds)))
         z = torch.from_numpy(np.random.RandomState(seed).randn(1, G.z_dim)).to(device)
-        img = G(z, label, truncation_psi=truncation_psi, noise_mode=noise_mode,
-                force_fp32 = True)
+
+        if torch.cuda.is_available():
+            img = G(z, label, truncation_psi=truncation_psi, noise_mode=noise_mode)
+        else:
+            img = G(z, label, truncation_psi=truncation_psi, noise_mode=noise_mode,
+                    force_fp32 = True)
+
         img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         PIL.Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{outdir}/{short_name}-{seed:010d}.png')
 
