@@ -12,6 +12,14 @@ python -m venv ../sg2
 install-gpu.sh  or  install-cpu.sh
 
 # Command to train
+# For gpu
 python train.py --data=../data/processed --outdir=../outdir \
        --gpus=1 --kimg=100 --snap=8 --metrics=None \
-       --cfg=<some cfg> --resume=<last_pkl or others>
+       --cfg=<some cfg, e.g, 11gb-gpu> \
+       --resume=<last_pkl or others, such as ffhq512>
+
+# For cpu
+python train.py --data=../data/processed --outdir=../outdir \
+       --gpus=1 --kimg=100 --snap=8 --metrics=None \
+       --cfg=<some cfg, e.g, cpu-base> \
+       --resume=<last_pkl or others, such as ffhq512>
