@@ -136,7 +136,12 @@ def generate_images(
                     force_fp32 = True)
 
         img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-        PIL.Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{outdir}/{short_name}-{seed:010d}.png')
+        if G.c_dim != 0:
+            PIL.Image.fromarray(img[0].cpu().numpy(), 'RGB') \
+                .save(f'{outdir}/{short_name}-c{class_idx}-{seed:010d}-{truncation_psi}.png')
+        else:
+            PIL.Image.fromarray(img[0].cpu().numpy(), 'RGB') \
+                .save(f'{outdir}/{short_name}-{seed:010d}-{truncation_psi}.png')
 
 
 #----------------------------------------------------------------------------
