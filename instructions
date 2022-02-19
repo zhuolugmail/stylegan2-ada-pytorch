@@ -1,4 +1,9 @@
 
+# Prepare data
+python dataset_tool.py --source=<source_zipped_file> \
+       --dest=<dest_dir> --width=<w> --height=<h>
+
+
 # Check python version
 python --version
 
