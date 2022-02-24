@@ -231,7 +231,10 @@ class MappingNetwork(torch.nn.Module):
         # Update moving average of W.
         if self.w_avg_beta is not None and self.training and not skip_w_avg_update:
             with torch.autograd.profiler.record_function('update_w_avg'):
-                self.w_avg.copy_(x.detach().mean(dim=0).lerp(self.w_avg, self.w_avg_beta))
+                # self.w_avg.copy_(x.detach().mean(dim=0).lerp(self.w_avg, self.w_avg_beta))
+                x_copy = x.detach().mean(dim=0)
+                x_copy = x_copy + self.w_avg_beta * (self.w_avg - x_copy)
+                self.w_avg.copy_(x_copy)
 
         # Broadcast.
         if self.num_ws is not None:
@@ -239,13 +242,15 @@ class MappingNetwork(torch.nn.Module):
                 x = x.unsqueeze(1).repeat([1, self.num_ws, 1])
 
         # Apply truncation.
-        if truncation_psi != 1:
+        if truncation_psi != 1.0:
             with torch.autograd.profiler.record_function('truncate'):
                 assert self.w_avg_beta is not None
                 if self.num_ws is None or truncation_cutoff is None:
-                    x = self.w_avg.lerp(x, truncation_psi)
+                    # x = self.w_avg.lerp(x, truncation_psi)
+                    x = self.w_avg + truncation_psi * (x - self.w_avg)
                 else:
-                    x[:, :truncation_cutoff] = self.w_avg.lerp(x[:, :truncation_cutoff], truncation_psi)
+                    # x[:, :truncation_cutoff] = self.w_avg.lerp(x[:, :truncation_cutoff], truncation_psi)
+                    x[:, :truncation_cutoff] = self.w_avg + truncation_psi * (x[:, :truncation_cutoff] - self.w_avg)
         return x
 
 #----------------------------------------------------------------------------

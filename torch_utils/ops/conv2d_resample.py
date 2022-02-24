@@ -15,6 +15,7 @@ from . import conv2d_gradfix
 from . import upfirdn2d
 from .upfirdn2d import _parse_padding
 from .upfirdn2d import _get_filter_size
+import numpy as np
 
 #----------------------------------------------------------------------------
 
@@ -33,7 +34,8 @@ def _conv2d_wrapper(x, w, stride=1, padding=0, groups=1, transpose=False, flip_w
 
     # Flip weight if requested.
     if not flip_weight: # conv2d() actually performs correlation (flip_weight=True) not convolution (flip_weight=False).
-        w = w.flip([2, 3])
+        # w = w.flip([2, 3])
+        w = torch.tensor(np.flip(w.numpy(), [2, 3]).copy(), torch.float32)
 
     # Workaround performance pitfall in cuDNN 8.0.5, triggered when using
     # 1x1 kernel + memory_format=channels_last + less than 64 channels.

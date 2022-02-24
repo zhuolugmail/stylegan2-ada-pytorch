@@ -110,7 +110,9 @@ def setup_filter(f, device=torch.device('cpu'), normalize=True, flip_filter=Fals
     if normalize:
         f /= f.sum()
     if flip_filter:
-        f = f.flip(list(range(f.ndim)))
+        # f = f.flip(list(range(f.ndim)))
+        f = torch.tensor(np.flip(f.numpy(), list(range(f.ndim))).copy(), dtype=torch.float32)
+
     f = f * (gain ** (f.ndim / 2))
     f = f.to(device=device)
     return f
@@ -193,7 +195,8 @@ def _upfirdn2d_ref(x, f, up=1, down=1, padding=0, flip_filter=False, gain=1):
     f = f * (gain ** (f.ndim / 2))
     f = f.to(x.dtype)
     if not flip_filter:
-        f = f.flip(list(range(f.ndim)))
+        # f = f.flip(list(range(f.ndim)))
+        f = torch.tensor(np.flip(f.numpy(), list(range(f.ndim))).copy(), device=x.device)
 
     # Convolve with the filter.
     f = f[np.newaxis, np.newaxis].repeat([num_channels, 1] + [1] * f.ndim)
